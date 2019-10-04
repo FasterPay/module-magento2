@@ -1,7 +1,10 @@
 <?php
 
 namespace Fasterpay\Fasterpay\Plugin\Sales\Order\Email\Container;
+
 use Fasterpay\Fasterpay\Model\Fasterpay;
+use \Magento\Sales\Model\Order\Email\Container\OrderIdentity;
+use \Magento\Checkout\Model\Session as CheckoutSession;
 
 class OrderIdentityPlugin
 {
@@ -16,7 +19,7 @@ class OrderIdentityPlugin
      * @codeCoverageIgnore
      */
     public function __construct(
-        \Magento\Checkout\Model\Session $checkoutSession
+        CheckoutSession $checkoutSession
     )
     {
         $this->checkoutSession = $checkoutSession;
@@ -27,7 +30,7 @@ class OrderIdentityPlugin
      * @param callable $proceed
      * @return bool
      */
-    public function aroundIsEnabled(\Magento\Sales\Model\Order\Email\Container\OrderIdentity $subject, callable $proceed)
+    public function aroundIsEnabled(OrderIdentity $subject, callable $proceed)
     {
         if ($this->checkoutSession->getQuote()->getPayment()->getMethod() == Fasterpay::PAYMENT_METHOD_CODE) {
             $forceOrderMailSentOnSuccess = $this->checkoutSession->getForceOrderMailSentOnSuccess();

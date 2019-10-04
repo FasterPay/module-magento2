@@ -1,15 +1,38 @@
 <?php
 namespace Fasterpay\Fasterpay\Model;
 
-use Magento\Sales\Model\Order;
-use Magento\Customer\Model\Customer;
+use \Magento\Sales\Model\Order;
+use \Magento\Customer\Model\Customer;
+use \Magento\Framework\Model\Context as ModelContext;
+use \Magento\Framework\Registry;
+use \Magento\Framework\Api\ExtensionAttributesFactory;
+use \Magento\Framework\Api\AttributeValueFactory;
+use \Magento\Payment\Helper\Data as DataHelper;
+use \Magento\Framework\App\Config\ScopeConfigInterface;
+use \Magento\Payment\Model\Method\Logger;
+use \Magento\Framework\ObjectManagerInterface;
+use \Magento\Framework\UrlInterface;
+use \Magento\Store\Model\StoreManagerInterface;
+use \Fasterpay\Fasterpay\Helper\Config as FPConfigHelper;
+use \Fasterpay\Fasterpay\Helper\Helper as FPHelper;
+use \Magento\Framework\Message\ManagerInterface;
+use \Magento\Framework\App\Request\Http as HttpRequest;
+use \Magento\Framework\Model\ResourceModel\AbstractResource;
+use \Magento\Framework\Data\Collection\AbstractDb;
+use \Magento\Payment\Model\Method\AbstractMethod;
+use \FasterPay\Services\Signature as FPSignature;
+use \FasterPay\Gateway as FPGateway;
+use \Magento\Framework\DataObject;
+use \Magento\Framework\App\Area as AppArea;
+use \Magento\Framework\Exception\LocalizedException;
+use \Magento\Payment\Model\InfoInterface;
 
 /**
  * Class Fasterpay
  *
  * @method \Magento\Quote\Api\Data\PaymentMethodExtensionInterface getExtensionAttributes()
  */
-class Fasterpay extends \Magento\Payment\Model\Method\AbstractMethod
+class Fasterpay extends AbstractMethod
 {
     const PAYMENT_METHOD_CODE = 'fasterpay';
     const MODULE_SOURCE = 'magento2';
@@ -20,33 +43,29 @@ class Fasterpay extends \Magento\Payment\Model\Method\AbstractMethod
     protected $objectManager;
     protected $urlBuilder;
     protected $helper;
-    protected $resourceConnection;
     protected $url;
-    protected $responseFactory;
     protected $messageManager;
     protected $request;
     protected $_canRefund = true;
     protected $_canRefundInvoicePartial = true;
 
     public function __construct(
-        \Magento\Framework\Model\Context $context,
-        \Magento\Framework\Registry $registry,
-        \Magento\Framework\Api\ExtensionAttributesFactory $extensionFactory,
-        \Magento\Framework\Api\AttributeValueFactory $customAttributeFactory,
-        \Magento\Payment\Helper\Data $paymentData,
-        \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig,
-        \Magento\Payment\Model\Method\Logger $logger,
-        \Magento\Framework\ObjectManagerInterface $objectManager,
-        \Magento\Framework\UrlInterface $urlBuilder,
-        \Magento\Store\Model\StoreManagerInterface $storeManager,
-        \Fasterpay\Fasterpay\Helper\Config $helperConfig,
-        \Fasterpay\Fasterpay\Helper\Helper $helper,
-        \Magento\Framework\App\ResourceConnection $resourceConnection,
-        \Magento\Framework\App\ResponseFactory $responseFactory,
-        \Magento\Framework\Message\ManagerInterface $messageManager,
-        \Magento\Framework\App\Request\Http $request,
-        \Magento\Framework\Model\ResourceModel\AbstractResource $resource = null,
-        \Magento\Framework\Data\Collection\AbstractDb $resourceCollection = null,
+        ModelContext $context,
+        Registry $registry,
+        ExtensionAttributesFactory $extensionFactory,
+        AttributeValueFactory $customAttributeFactory,
+        DataHelper $paymentData,
+        ScopeConfigInterface $scopeConfig,
+        Logger $logger,
+        ObjectManagerInterface $objectManager,
+        UrlInterface $urlBuilder,
+        StoreManagerInterface $storeManager,
+        FPConfigHelper $helperConfig,
+        FPHelper $helper,
+        ManagerInterface $messageManager,
+        HttpRequest $request,
+        AbstractResource $resource = null,
+        AbstractDb $resourceCollection = null,
         array $data = []
     ) {
         parent::__construct(
@@ -66,13 +85,11 @@ class Fasterpay extends \Magento\Payment\Model\Method\AbstractMethod
         $this->_storeManager = $storeManager;
         $this->helperConfig = $helperConfig;
         $this->helper = $helper;
-        $this->resourceConnection = $resourceConnection;
-        $this->responseFactory = $responseFactory;
         $this->messageManager = $messageManager;
         $this->request = $request;
     }
 
-    public function generateForm(\Magento\Sales\Model\Order $order)
+    public function generateForm(Order $order)
     {
         if ($order->hasBillingAddressId()) {
             $billingData = $order->getBillingAddress()->getData();
@@ -86,7 +103,7 @@ class Fasterpay extends \Magento\Payment\Model\Method\AbstractMethod
                 'merchant_order_id' => $order->getIncrementId(),
                 'success_url' => $this->urlBuilder->getUrl('fasterpay/onepage/success/'),
                 'pingback_url' => $this->urlBuilder->getUrl('fasterpay/index/pingback/'),
-                'sign_version' => \FasterPay\Services\Signature::SIGN_VERSION_2,
+                'sign_version' => FPSignature::SIGN_VERSION_2,
                 'module_source' => self::MODULE_SOURCE,
                 'email' =>  !empty($billingData['email']) ? $billingData['email'] : '',
                 'first_name' => !empty($billingData['firstname']) ? $billingData['firstname'] : '',
@@ -106,17 +123,18 @@ class Fasterpay extends \Magento\Payment\Model\Method\AbstractMethod
     public function getGateway()
     {
         if (empty($this->gateway)) {
-            $this->gateway = new \FasterPay\Gateway([
+            $this->gateway = new FPGateway([
                 'publicKey' => $this->helperConfig->getConfig('public_key'),
                 'privateKey' => $this->helperConfig->getConfig('private_key'),
-                'isTest' => $this->helperConfig->getConfig('is_test')
+                'isTest' => $this->helperConfig->getConfig('is_test'),
+                'apiBaseUrl' => 'http://develop.pay2.fasterpay.bamboo.stuffio.com'
             ]);
         }
 
         return $this->gateway;
     }
 
-    public function refund(\Magento\Payment\Model\InfoInterface $payment, $amount)
+    public function refund(InfoInterface $payment, $amount)
     {
         parent::refund($payment, $amount);
 
@@ -124,7 +142,6 @@ class Fasterpay extends \Magento\Payment\Model\Method\AbstractMethod
         if ($captureTxnId) {
             $order = $payment->getOrder();
             $canRefundMore = $payment->getCreditmemo()->getInvoice()->canRefund();
-            // $isFullRefund = !$canRefundMore && 0 == ((double)$order->getBaseTotalOnlineRefunded() + (double)$order->getBaseTotalOfflineRefunded());
 
             if ($this->_isCalledFromPingback()) {
                 $this->_importRefundResultToPayment($captureTxnId, $payment, $canRefundMore);
@@ -139,11 +156,11 @@ class Fasterpay extends \Magento\Payment\Model\Method\AbstractMethod
 
             // avoid catch LocalizedException error on ver2.0
             $this->messageManager->addError(__(self::REFUND_PENDING_MESSAGE));
-            throw new \Magento\Framework\Exception\LocalizedException(
+            throw new LocalizedException(
                 __(self::REFUND_PENDING_MESSAGE)
             );
         } else {
-            throw new \Magento\Framework\Exception\LocalizedException(
+            throw new LocalizedException(
                 __('We can\'t issue a refund transaction because there is no capture transaction.')
             );
         }
@@ -159,13 +176,13 @@ class Fasterpay extends \Magento\Payment\Model\Method\AbstractMethod
         try {
             $refundResponse = $this->getGateway()->paymentService()->refund($transactionId, $amount);
         } catch (FasterPay\Exception $e) {
-            throw new \Magento\Framework\Exception\LocalizedException(
+            throw new LocalizedException(
                 __($e->getMessage())
             );
         }
 
         if (!$refundResponse->isSuccessful()) {
-            throw new \Magento\Framework\Exception\LocalizedException(
+            throw new LocalizedException(
                 __($refundResponse->getErrors()->getMessage())
             );
         }
@@ -180,7 +197,7 @@ class Fasterpay extends \Magento\Payment\Model\Method\AbstractMethod
             ->setShouldCloseParentTransaction(!$canRefundMore);
     }
 
-    protected function _getParentTransactionId(\Magento\Framework\DataObject $payment)
+    protected function _getParentTransactionId(DataObject $payment)
     {
         return $payment->getParentTransactionId();
     }
@@ -189,7 +206,7 @@ class Fasterpay extends \Magento\Payment\Model\Method\AbstractMethod
     {
         $areaCode = $this->_appState->getAreaCode();
 
-        if ($areaCode == \Magento\Framework\App\Area::AREA_FRONTEND) {
+        if ($areaCode == AppArea::AREA_FRONTEND) {
             return true;
         }
 

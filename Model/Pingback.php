@@ -2,27 +2,29 @@
 namespace Fasterpay\Fasterpay\Model;
 
 use Magento\Framework\Exception\CouldNotSaveException;
+use \Magento\Sales\Model\Order as OrderModel;
+use \Magento\Sales\Model\Service\InvoiceService;
+use \Magento\Framework\DB\Transaction as DBTransaction;
+use \Magento\Sales\Model\Order\Payment as OrderPayment;
+use \Magento\Sales\Model\Order\Email\Sender\OrderSender;
+use \Magento\Checkout\Model\Session as CheckoutSession;
+use \Magento\Sales\Model\Service\CreditmemoService;
+use \Magento\Sales\Model\Order\CreditmemoFactory;
+use \Magento\Sales\Model\Order\Invoice;
+use \FasterPay\Services\Signature as FPSignature;
 
 class Pingback
 {
-    protected $objectManager;
-    protected $helperConfig;
-    protected $helper;
     protected $orderModel;
-    protected $transactionSearchResult;
     protected $invoiceService;
     protected $dbTransaction;
     protected $payment;
-    protected $pingbackFactory;
     protected $orderSender;
     protected $checkoutSession;
     protected $creditmemoService;
     protected $creditmemoFactory;
     protected $paymentModel;
     protected $invoiceModel;
-    protected $request;
-    protected $pingbackData;
-    protected $validationParams;
 
     const PINGBACK_OK = 'OK';
     const PINGBACK_PAYMENT_ORDER_STATUS_SUCCESS = 'successful';
@@ -44,26 +46,18 @@ class Pingback
     ];
 
     public function __construct(
-        \Magento\Framework\ObjectManagerInterface $objectManager,
-        \Magento\Sales\Model\Order $orderModel,
-        \Magento\Sales\Api\Data\TransactionSearchResultInterface $transactionSearchResult,
-        \Fasterpay\Fasterpay\Helper\Config $helperConfig,
-        \Fasterpay\Fasterpay\Helper\Helper $helper,
-        \Magento\Sales\Model\Service\InvoiceService $invoiceService,
-        \Magento\Framework\DB\Transaction $dbTransaction,
-        \Magento\Sales\Model\Order\Payment $payment,
-        \Magento\Sales\Model\Order\Email\Sender\OrderSender $orderSender,
-        \Magento\Checkout\Model\Session $checkoutSession,
-        \Magento\Sales\Model\Service\CreditmemoService $creditmemoService,
-        \Magento\Sales\Model\Order\CreditmemoFactory $creditmemoFactory,
-        \Magento\Sales\Model\Order\Invoice $invoiceModel,
+        OrderModel $orderModel,
+        InvoiceService $invoiceService,
+        DBTransaction $dbTransaction,
+        OrderPayment $payment,
+        OrderSender $orderSender,
+        CheckoutSession $checkoutSession,
+        CreditmemoService $creditmemoService,
+        CreditmemoFactory $creditmemoFactory,
+        Invoice $invoiceModel,
         Fasterpay $paymentModel
     ) {
-        $this->objectManager = $objectManager;
         $this->orderModel = $orderModel;
-        $this->helperConfig = $helperConfig;
-        $this->helper = $helper;
-        $this->transactionSearchResult = $transactionSearchResult;
         $this->invoiceService = $invoiceService;
         $this->dbTransaction = $dbTransaction;
         $this->payment = $payment;
@@ -78,40 +72,40 @@ class Pingback
     public function pingback($request)
     {
         try {
-            $this->request = $request;
+            $request;
             $gateway = $this->paymentModel->getGateway();
 
-            $signVersion = \FasterPay\Services\Signature::SIGN_VERSION_1;
-            if (!empty($this->request->getHeader('x-fasterpay-signature-version'))) {
-                $signVersion = $this->request->getHeader('x-fasterpay-signature-version');
+            $signVersion = FPSignature::SIGN_VERSION_1;
+            if (!empty($request->getHeader('x-fasterpay-signature-version'))) {
+                $signVersion = $request->getHeader('x-fasterpay-signature-version');
             }
-            $this->validationParams = [];
+            $validationParams = [];
 
             switch ($signVersion) {
-                case \FasterPay\Services\Signature::SIGN_VERSION_1:
-                    $this->validationParams = ['apiKey' => $this->request->getHeader('x-apikey')];
-                    $this->pingbackData = $this->request->getPost();
+                case FPSignature::SIGN_VERSION_1:
+                    $validationParams = ['apiKey' => $request->getHeader('x-apikey')];
+                    $pingbackData = $request->getPost();
                     break;
-                case \FasterPay\Services\Signature::SIGN_VERSION_2:
-                    $this->validationParams = [
-                        'pingbackData' => $this->request->getContent(),
+                case FPSignature::SIGN_VERSION_2:
+                    $validationParams = [
+                        'pingbackData' => $request->getContent(),
                         'signVersion' => $signVersion,
-                        'signature' => $this->request->getHeader('x-fasterpay-signature'),
+                        'signature' => $request->getHeader('x-fasterpay-signature'),
                     ];
-                    $this->pingbackData = json_decode($this->validationParams['pingbackData'], true);
+                    $pingbackData = json_decode($validationParams['pingbackData'], true);
                     break;
                 default:
                     throw new \Exception('Invalid Signature Version');
             }
 
-            if (empty($this->pingbackData)) {
+            if (empty($pingbackData)) {
                 throw new \Exception('Invalid Pingback Data');
             }
 
-            if ($this->_isPaymentEvent()) {
-                $this->_paymentPingbackHandle();
-            } elseif ($this->_isRefundEvent()) {
-                $this->_refundPingbackHandle();
+            if ($this->_isPaymentEvent($pingbackData)) {
+                $this->_paymentPingbackHandle($pingbackData, $validationParams);
+            } elseif ($this->_isRefundEvent($pingbackData)) {
+                $this->_refundPingbackHandle($pingbackData);
             } else {
                 throw new \Exception('Invalid Pingback Event');
             }
@@ -122,7 +116,7 @@ class Pingback
         }
     }
 
-    public function createOrderInvoice(\Magento\Sales\Model\Order $order, $pingback)
+    public function createOrderInvoice(OrderModel $order, $pingback)
     {
         try {
             if ($order->canInvoice()) {
@@ -167,48 +161,48 @@ class Pingback
         }
     }
 
-    protected function _isPaymentEvent()
+    protected function _isPaymentEvent($pingbackData)
     {
-        return $this->pingbackData['event'] == self::PINGBACK_EVENT_PAYMENT;
+        return $pingbackData['event'] == self::PINGBACK_EVENT_PAYMENT;
     }
 
-    protected function _isRefundEvent()
+    protected function _isRefundEvent($pingbackData)
     {
-        return in_array($this->pingbackData['event'], self::PINGBACK_EVENT_REFUND);
+        return in_array($pingbackData['event'], self::PINGBACK_EVENT_REFUND);
     }
 
-    protected function _paymentPingbackHandle()
+    protected function _paymentPingbackHandle($pingbackData, $validationParams)
     {
-        $this->_paymentPingbackValidate();
+        $this->_paymentPingbackValidate($pingbackData, $validationParams);
 
-        if ($this->pingbackData['payment_order']['status'] != self::PINGBACK_PAYMENT_ORDER_STATUS_SUCCESS) {
+        if ($pingbackData['payment_order']['status'] != self::PINGBACK_PAYMENT_ORDER_STATUS_SUCCESS) {
             return;
         }
 
         $orderModel = $this->orderModel;
         $orderStatus = $orderModel::STATE_PROCESSING;
-        $this->createOrderInvoice($orderModel, $this->pingbackData);
+        $this->createOrderInvoice($orderModel, $pingbackData);
         $orderModel->setStatus($orderStatus);
         $orderModel->save();
         $this->checkoutSession->setForceOrderMailSentOnSuccess(true);
         $this->orderSender->send($orderModel, true);
     }
 
-    protected function _paymentPingbackValidate()
+    protected function _paymentPingbackValidate($pingbackData, $validationParams)
     {
-        if (!isset($this->pingbackData['payment_order']['id'])) {
+        if (!isset($pingbackData['payment_order']['id'])) {
             throw new \Exception('Invalid Pingback Data');
         }
 
-        if (!isset($this->pingbackData['payment_order']['merchant_order_id'])) {
+        if (!isset($pingbackData['payment_order']['merchant_order_id'])) {
             throw new \Exception('Invalid Pingback Data');
         }
 
-        if (!isset($this->pingbackData['payment_order']['status'])) {
+        if (!isset($pingbackData['payment_order']['status'])) {
             throw new \Exception('Invalid Pingback Data');
         }
 
-        $orderIncrementId = $this->pingbackData['payment_order']['merchant_order_id'];
+        $orderIncrementId = $pingbackData['payment_order']['merchant_order_id'];
         $orderModel = $this->orderModel;
         $orderModel->loadByIncrementId($orderIncrementId);
 
@@ -216,16 +210,16 @@ class Pingback
             throw new \Exception('Invalid Order');
         }
 
-        if (!$this->paymentModel->getGateway()->pingback()->validate($this->validationParams)) {
+        if (!$this->paymentModel->getGateway()->pingback()->validate($validationParams)) {
             throw new \Exception('Invalid Pingback Data');
         }
     }
 
-    protected function _refundPingbackHandle()
+    protected function _refundPingbackHandle($pingbackData)
     {
-        $this->_refundPingbackValidate();
+        $this->_refundPingbackValidate($pingbackData);
 
-        $paymentOrder = $this->pingbackData['payment_order'];
+        $paymentOrder = $pingbackData['payment_order'];
         $amount = $paymentOrder['refund_amount'];
         $referenceId = $paymentOrder['reference_id'];
         $fpTxnId = $paymentOrder['id'];
@@ -271,33 +265,33 @@ class Pingback
         $order->save();
     }
 
-    protected function _refundPingbackValidate()
+    protected function _refundPingbackValidate($pingbackData)
     {
-        if (!isset($this->pingbackData['payment_order']['id'])) {
+        if (!isset($pingbackData['payment_order']['id'])) {
             throw new \Exception('Invalid Pingback Data');
         }
 
-        if (!isset($this->pingbackData['payment_order']['merchant_order_id'])) {
+        if (!isset($pingbackData['payment_order']['merchant_order_id'])) {
             throw new \Exception('Invalid Pingback Data');
         }
 
-        if (!isset($this->pingbackData['payment_order']['total_refunded_amount'])) {
+        if (!isset($pingbackData['payment_order']['total_refunded_amount'])) {
             throw new \Exception('Invalid Pingback Data');
         }
 
-        if (!isset($this->pingbackData['payment_order']['reference_id'])) {
+        if (!isset($pingbackData['payment_order']['reference_id'])) {
             throw new \Exception('Invalid Pingback Data');
         }
 
-        if (!isset($this->pingbackData['payment_order']['status'])) {
+        if (!isset($pingbackData['payment_order']['status'])) {
             throw new \Exception('Invalid Pingback Data');
         }
 
-        if (!isset($this->pingbackData['payment_order']['refund_amount'])) {
+        if (!isset($pingbackData['payment_order']['refund_amount'])) {
             throw new \Exception('Invalid Pingback Data');
         }
 
-        $orderIncrementId = $this->pingbackData['payment_order']['merchant_order_id'];
+        $orderIncrementId = $pingbackData['payment_order']['merchant_order_id'];
         $orderModel = $this->orderModel;
         $orderModel->loadByIncrementId($orderIncrementId);
 

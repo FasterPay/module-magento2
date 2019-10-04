@@ -1,7 +1,9 @@
 <?php
 namespace Fasterpay\Fasterpay\Controller\Gateway;
 
-class Fasterpay extends \Magento\Checkout\Controller\Onepage
+use \Magento\Checkout\Controller\Onepage as OnepageAction;
+
+class Fasterpay extends OnepageAction
 {
 
     public function execute()

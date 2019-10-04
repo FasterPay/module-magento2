@@ -1,23 +1,28 @@
 <?php
 namespace Fasterpay\Fasterpay\Controller\Index;
 
-class Pingback extends \Magento\Framework\App\Action\Action
+use \Magento\Framework\App\Action\Action as Action;
+use \Magento\Framework\App\Action\Context as ActionContext;
+use \Magento\Framework\View\Result\PageFactory;
+use \Fasterpay\Fasterpay\Model\Pingback as PingbackModel;
+
+class Pingback extends Action
 {
 
-    protected $modelPingback;
+    protected $pingbackModel;
 
     public function __construct(
-        \Magento\Framework\App\Action\Context $context,
-        \Magento\Framework\View\Result\PageFactory $pageFactory,
-        \Fasterpay\Fasterpay\Model\Pingback $modelPingback
+        ActionContext $context,
+        PageFactory $pageFactory,
+        PingbackModel $pingbackModel
     ) {
         parent::__construct($context);
         $this->pageFactory = $pageFactory;
-        $this->modelPingback = $modelPingback;
+        $this->pingbackModel = $pingbackModel;
     }
 
     public function execute()
     {
-        $this->getResponse()->setBody($this->modelPingback->pingback($this->_request));
+        $this->getResponse()->setBody($this->pingbackModel->pingback($this->_request));
     }
 }

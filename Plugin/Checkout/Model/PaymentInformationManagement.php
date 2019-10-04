@@ -1,7 +1,10 @@
 <?php
 namespace Fasterpay\Fasterpay\Plugin\Checkout\Model;
 
-use Magento\Framework\Exception\CouldNotSaveException;
+use \Magento\Framework\Exception\CouldNotSaveException;
+use \Magento\Checkout\Model\PaymentInformationManagement;
+use \Magento\Framework\Exception\CouldNotSaveException;
+use \Magento\Framework\App\ProductMetadataInterface;
 
 class PaymentInformationManagement
 {
@@ -9,20 +12,20 @@ class PaymentInformationManagement
     protected $prdMetadata;
 
     public function __construct(
-        \Magento\Framework\App\ProductMetadataInterface $prdMetadata
+        ProductMetadataInterface $prdMetadata
     ) {
         $this->prdMetadata = $prdMetadata;
     }
 
     public function aroundSavePaymentInformationAndPlaceOrder(
-        \Magento\Checkout\Model\PaymentInformationManagement $subject,
+        PaymentInformationManagement $subject,
         callable $proceed,
         ...$args
     ) {
         try {
             $result = $proceed(...$args);
             return $result;
-        } catch (\Magento\Framework\Exception\CouldNotSaveException $e) {
+        } catch (CouldNotSaveException $e) {
             $version = $this->prdMetadata->getVersion();
             if (version_compare($version, '2.1', '>')) {
                 throw new CouldNotSaveException(
