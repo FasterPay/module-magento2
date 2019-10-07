@@ -10,13 +10,9 @@ use \Magento\Framework\Api\AttributeValueFactory;
 use \Magento\Payment\Helper\Data as DataHelper;
 use \Magento\Framework\App\Config\ScopeConfigInterface;
 use \Magento\Payment\Model\Method\Logger;
-use \Magento\Framework\ObjectManagerInterface;
 use \Magento\Framework\UrlInterface;
-use \Magento\Store\Model\StoreManagerInterface;
 use \Fasterpay\Fasterpay\Helper\Config as FPConfigHelper;
-use \Fasterpay\Fasterpay\Helper\Helper as FPHelper;
 use \Magento\Framework\Message\ManagerInterface;
-use \Magento\Framework\App\Request\Http as HttpRequest;
 use \Magento\Framework\Model\ResourceModel\AbstractResource;
 use \Magento\Framework\Data\Collection\AbstractDb;
 use \Magento\Payment\Model\Method\AbstractMethod;
@@ -26,7 +22,6 @@ use \Magento\Framework\DataObject;
 use \Magento\Framework\App\Area as AppArea;
 use \Magento\Framework\Exception\LocalizedException;
 use \Magento\Payment\Model\InfoInterface;
-
 /**
  * Class Fasterpay
  *
@@ -45,7 +40,6 @@ class Fasterpay extends AbstractMethod
     protected $helper;
     protected $url;
     protected $messageManager;
-    protected $request;
     protected $_canRefund = true;
     protected $_canRefundInvoicePartial = true;
 
@@ -57,13 +51,9 @@ class Fasterpay extends AbstractMethod
         DataHelper $paymentData,
         ScopeConfigInterface $scopeConfig,
         Logger $logger,
-        ObjectManagerInterface $objectManager,
         UrlInterface $urlBuilder,
-        StoreManagerInterface $storeManager,
         FPConfigHelper $helperConfig,
-        FPHelper $helper,
         ManagerInterface $messageManager,
-        HttpRequest $request,
         AbstractResource $resource = null,
         AbstractDb $resourceCollection = null,
         array $data = []
@@ -80,13 +70,9 @@ class Fasterpay extends AbstractMethod
             $resourceCollection,
             $data
         );
-        $this->objectManager = $objectManager;
         $this->urlBuilder = $urlBuilder;
-        $this->_storeManager = $storeManager;
         $this->helperConfig = $helperConfig;
-        $this->helper = $helper;
         $this->messageManager = $messageManager;
-        $this->request = $request;
     }
 
     public function generateForm(Order $order)
@@ -126,8 +112,7 @@ class Fasterpay extends AbstractMethod
             $this->gateway = new FPGateway([
                 'publicKey' => $this->helperConfig->getConfig('public_key'),
                 'privateKey' => $this->helperConfig->getConfig('private_key'),
-                'isTest' => $this->helperConfig->getConfig('is_test'),
-                'apiBaseUrl' => 'http://develop.pay2.fasterpay.bamboo.stuffio.com'
+                'isTest' => $this->helperConfig->getConfig('test_mode')
             ]);
         }
 
@@ -148,11 +133,7 @@ class Fasterpay extends AbstractMethod
                 return $this;
             }
 
-            $refundResponse = $this->_createRefund($captureTxnId, $amount);
-            $reponseData = $refundResponse->getResponse('data');
-            $referenceId = $reponseData['reference_id'];
-            $fpTxnId = $reponseData['id'];
-            $isRefundSuccess = $this->isRefundSuccess($reponseData['status']);
+            $this->_createRefund($captureTxnId, $amount);
 
             // avoid catch LocalizedException error on ver2.0
             $this->messageManager->addError(__(self::REFUND_PENDING_MESSAGE));
@@ -204,10 +185,15 @@ class Fasterpay extends AbstractMethod
 
     protected function _isCalledFromPingback()
     {
-        $areaCode = $this->_appState->getAreaCode();
+        $trace = debug_backtrace();
 
-        if ($areaCode == AppArea::AREA_FRONTEND) {
-            return true;
+        foreach ($trace as $caller) {
+            if (isset($caller['class'])
+                && isset($caller['function'])
+                && $caller['class'] == Pingback::class
+                && $caller['function'] == 'pingback') {
+                return true;
+            }
         }
 
         return false;

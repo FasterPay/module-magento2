@@ -3,8 +3,7 @@ namespace Fasterpay\Fasterpay\Plugin\Checkout\Model;
 
 use \Magento\Framework\Exception\CouldNotSaveException;
 use \Magento\Framework\App\ProductMetadataInterface;
-use \Magento\Checkout\Model\GuestPaymentInformationManagement;
-use \Magento\Framework\Exception\CouldNotSaveException;
+use \Magento\Checkout\Model\GuestPaymentInformationManagement as GuestPaymentInformationManagementModel;
 
 class GuestPaymentInformationManagement
 {
@@ -17,7 +16,7 @@ class GuestPaymentInformationManagement
     }
 
     public function aroundSavePaymentInformationAndPlaceOrder(
-        GuestPaymentInformationManagement $subject,
+        GuestPaymentInformationManagementModel $subject,
         callable $proceed,
         ...$args
     ) {

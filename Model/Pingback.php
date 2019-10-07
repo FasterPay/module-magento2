@@ -25,6 +25,7 @@ class Pingback
     protected $creditmemoFactory;
     protected $paymentModel;
     protected $invoiceModel;
+    protected $dataObject;
 
     const PINGBACK_OK = 'OK';
     const PINGBACK_PAYMENT_ORDER_STATUS_SUCCESS = 'successful';
@@ -102,8 +103,12 @@ class Pingback
                 throw new \Exception('Invalid Pingback Data');
             }
 
+            if (!$this->paymentModel->getGateway()->pingback()->validate($validationParams)) {
+                throw new \Exception('Invalid Pingback Data');
+            }
+
             if ($this->_isPaymentEvent($pingbackData)) {
-                $this->_paymentPingbackHandle($pingbackData, $validationParams);
+                $this->_paymentPingbackHandle($pingbackData);
             } elseif ($this->_isRefundEvent($pingbackData)) {
                 $this->_refundPingbackHandle($pingbackData);
             } else {
@@ -171,9 +176,9 @@ class Pingback
         return in_array($pingbackData['event'], self::PINGBACK_EVENT_REFUND);
     }
 
-    protected function _paymentPingbackHandle($pingbackData, $validationParams)
+    protected function _paymentPingbackHandle($pingbackData)
     {
-        $this->_paymentPingbackValidate($pingbackData, $validationParams);
+        $this->_paymentPingbackValidate($pingbackData);
 
         if ($pingbackData['payment_order']['status'] != self::PINGBACK_PAYMENT_ORDER_STATUS_SUCCESS) {
             return;
@@ -188,13 +193,13 @@ class Pingback
         $this->orderSender->send($orderModel, true);
     }
 
-    protected function _paymentPingbackValidate($pingbackData, $validationParams)
+    protected function _paymentPingbackValidate($pingbackData)
     {
-        if (!isset($pingbackData['payment_order']['id'])) {
+        if (empty($pingbackData['payment_order']['id'])) {
             throw new \Exception('Invalid Pingback Data');
         }
 
-        if (!isset($pingbackData['payment_order']['merchant_order_id'])) {
+        if (empty($pingbackData['payment_order']['merchant_order_id'])) {
             throw new \Exception('Invalid Pingback Data');
         }
 
@@ -209,10 +214,6 @@ class Pingback
         if (!$orderModel->getId()) {
             throw new \Exception('Invalid Order');
         }
-
-        if (!$this->paymentModel->getGateway()->pingback()->validate($validationParams)) {
-            throw new \Exception('Invalid Pingback Data');
-        }
     }
 
     protected function _refundPingbackHandle($pingbackData)
@@ -223,9 +224,8 @@ class Pingback
         $amount = $paymentOrder['refund_amount'];
         $referenceId = $paymentOrder['reference_id'];
         $fpTxnId = $paymentOrder['id'];
-        $status = $paymentOrder['status'];
 
-        if (!$this->paymentModel->isRefundSuccess($status)) {
+        if (!$this->paymentModel->isRefundSuccess($paymentOrder['status'])) {
             return;
         }
 
@@ -267,11 +267,11 @@ class Pingback
 
     protected function _refundPingbackValidate($pingbackData)
     {
-        if (!isset($pingbackData['payment_order']['id'])) {
+        if (empty($pingbackData['payment_order']['id'])) {
             throw new \Exception('Invalid Pingback Data');
         }
 
-        if (!isset($pingbackData['payment_order']['merchant_order_id'])) {
+        if (empty($pingbackData['payment_order']['merchant_order_id'])) {
             throw new \Exception('Invalid Pingback Data');
         }
 
