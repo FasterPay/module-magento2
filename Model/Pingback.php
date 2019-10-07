@@ -249,7 +249,7 @@ class Pingback
             'qtys' => $refundItems,
             'adjustment_positive' => $amount,
             'shipping_amount' => 0,
-            'adjustment_negative' = 0
+            'adjustment_negative' => 0
         ]);
 
         // Don't set invoice if you want to do offline refund
