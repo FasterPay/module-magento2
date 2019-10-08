@@ -22,6 +22,7 @@ use \Magento\Framework\DataObject;
 use \Magento\Framework\App\Area as AppArea;
 use \Magento\Framework\Exception\LocalizedException;
 use \Magento\Payment\Model\InfoInterface;
+use \Magento\Framework\App\RequestInterface;
 /**
  * Class Fasterpay
  *
@@ -40,6 +41,7 @@ class Fasterpay extends AbstractMethod
     protected $helper;
     protected $url;
     protected $messageManager;
+    protected $request;
     protected $_canRefund = true;
     protected $_canRefundInvoicePartial = true;
 
@@ -54,6 +56,7 @@ class Fasterpay extends AbstractMethod
         UrlInterface $urlBuilder,
         FPConfigHelper $helperConfig,
         ManagerInterface $messageManager,
+        RequestInterface $request,
         AbstractResource $resource = null,
         AbstractDb $resourceCollection = null,
         array $data = []
@@ -70,6 +73,7 @@ class Fasterpay extends AbstractMethod
             $resourceCollection,
             $data
         );
+        $this->request = $request;
         $this->urlBuilder = $urlBuilder;
         $this->helperConfig = $helperConfig;
         $this->messageManager = $messageManager;
@@ -185,17 +189,9 @@ class Fasterpay extends AbstractMethod
 
     protected function _isCalledFromPingback()
     {
-        $trace = debug_backtrace();
-
-        foreach ($trace as $caller) {
-            if (isset($caller['class'])
-                && isset($caller['function'])
-                && $caller['class'] == Pingback::class
-                && $caller['function'] == 'pingback') {
-                return true;
-            }
-        }
-
-        return false;
+        return $this->request->getRouteName() == 'fasterpay'
+            && $this->request->getModuleName() == 'fasterpay'
+            && $this->request->getControllerName() == 'index'
+            && $this->request->getActionName() == 'pingback';
     }
 }
