@@ -6,7 +6,7 @@
                 <active>1</active>
                 <model>Fasterpay\Fasterpay\Model\Fasterpay</model>
                 <order_status>pending_payment</order_status>
-                <title>Fasterpay</title>
+                <title>FasterPay</title>
                 <allowspecific>0</allowspecific>
             </fasterpay>
         </payment>
