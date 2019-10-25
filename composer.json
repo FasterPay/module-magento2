@@ -1,0 +1,36 @@
+{
+    "name": "fasterpay/module-magento2",
+    "description": "Offical Fasterpay module for Magento 2",
+    "version": "1.0.0",
+    "type": "magento2-module",
+    "homepage": "https://www.fasterpay.com",
+    "keywords": [
+        "fasterpay",
+        "api",
+        "payments",
+        "carrier billing",
+        "credit cards",
+        "alternative payments",
+        "monetization",
+        "recurring billing",
+        "payment processing"
+    ],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Fasterpay Team",
+            "email": "devsupport@fasterpay.com"
+        }
+    ],
+    "require": {
+        "fasterpay/fasterpay-php": "1.2.*"
+    },
+    "autoload": {
+        "psr-4": {
+            "Fasterpay\\Fasterpay\\": ""
+        },
+        "files": [
+            "registration.php"
+        ]
+    }
+}
