@@ -185,10 +185,19 @@ class Pingback
         }
 
         $orderModel = $this->orderModel;
-        $orderStatus = $orderModel::STATE_PROCESSING;
+        // solve issue on 2.3.? : not auto udpate status after payment
+        $orderStatus = $orderModel->getIsVirtual() ? $orderModel::STATE_COMPLETE : $orderModel::STATE_PROCESSING;
         $this->createOrderInvoice($orderModel, $pingbackData);
         $orderModel->setStatus($orderStatus);
         $orderModel->save();
+
+        if ($orderModel->getIsVirtual()) {
+            $deliveryStatus = Fasterpay::DELIVERY_STATUS_DELIVERED;
+        } else {
+            $deliveryStatus = Fasterpay::DELIVERY_STATUS_ORDER_PLACED;
+        }
+        $this->paymentModel->sendDeliveryInformation($orderModel, $deliveryStatus);
+
         $this->checkoutSession->setForceOrderMailSentOnSuccess(true);
         $this->orderSender->send($orderModel, true);
     }
