@@ -14,4 +14,7 @@
             </argument>
         </arguments>
     </type>
+    <type name="Magento\Framework\App\Request\CsrfValidator">
+        <plugin name="CsrfValidatorSkip" type="Fasterpay\Fasterpay\Plugin\Framework\App\Request\CsrfValidatorSkipPlugin" />
+    </type>
 </config>

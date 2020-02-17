@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:Event/etc/events.xsd">
+    <event name="sales_order_save_after">
+        <observer name="Fasterpay_Fasterpay_Order_Save_After" instance="Fasterpay\Fasterpay\Observer\OrderObserver" />
+    </event>
+    <event name="sales_order_shipment_track_save_after">
+        <observer name="Fasterpay_Fasterpay_Order_Shipment_Track_Save_After" instance="Fasterpay\Fasterpay\Observer\TrackingInfoObserver" />
+    </event>
+</config>
