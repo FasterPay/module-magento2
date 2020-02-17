@@ -14,16 +14,12 @@ class Fasterpay extends OnepageAction
         }
         $session->clearQuote();
 
-        $form = $this->_view->getLayout()
-            ->createBlock('Fasterpay\Fasterpay\Block\Fasterpay')
-            ->setTemplate('Fasterpay_Fasterpay::fasterpay.phtml')
-            ->toHtml();
+        $resultPage = $this->resultPageFactory->create();
 
         $this->_eventManager->dispatch(
             'checkout_onepage_controller_success_action',
             ['order_ids' => [$session->getLastOrderId()]]
         );
-
-        $this->getResponse()->setBody($form);
+        return $resultPage;
     }
 }

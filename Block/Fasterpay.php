@@ -1,8 +1,6 @@
 <?php
 namespace Fasterpay\Fasterpay\Block;
 
-use \Magento\Sales\Model\Order;
-use \Magento\Framework\Controller\Result\RedirectFactory;
 use \Magento\Framework\View\Element\Template\Context as TemplateContext;
 use \Magento\Checkout\Model\Session as CheckoutSession;
 use \Fasterpay\Fasterpay\Model\Fasterpay as FPModel;
