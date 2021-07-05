@@ -30,7 +30,7 @@ final class ConfigProvider implements ConfigProviderInterface
             'payment' => [
                 self::CODE => [
                     'defaultWidgetPageUrl' => 'fasterpay/gateway/fasterpay',
-                    'logoUrl' => $this->getViewFileUrl('Fasterpay_Fasterpay::images/fp_logo_dark.png')
+                    'logoUrl' => 'https://pay.fasterpay.com/images/logo/v1/fp-logo-dark.png'
                 ]
             ]
         ];
