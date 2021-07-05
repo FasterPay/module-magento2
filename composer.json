@@ -1,7 +1,7 @@
 {
     "name": "fasterpay/module-magento2",
     "description": "Offical Fasterpay module for Magento 2",
-    "version": "1.1.0",
+    "version": "1.1.1",
     "type": "magento2-module",
     "homepage": "https://www.fasterpay.com",
     "keywords": [
