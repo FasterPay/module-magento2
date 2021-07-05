@@ -6,4 +6,7 @@
     <event name="sales_order_shipment_track_save_after">
         <observer name="Fasterpay_Fasterpay_Order_Shipment_Track_Save_After" instance="Fasterpay\Fasterpay\Observer\TrackingInfoObserver" />
     </event>
+    <event name="sales_order_place_after">
+        <observer name="Fasterpay_Fasterpay_event_email_stopper" instance="Fasterpay\Fasterpay\Observer\OrderEmailStop" />
+    </event>
 </config>

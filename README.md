@@ -3,8 +3,7 @@ Fasterpay module for Magento 2.
 
 
 ### Versions
-* Tested on Magento 2.1
-* PHP 5.6.5 or later
+* Tested on Magento 2.1, 2.2, 2.3, and 2.4
 
 # Installation
 To install Fasterpay Magento 2 module, please follow the [instructions](https://docs.fasterpay.com/integration/plugins/magento).
