@@ -120,7 +120,8 @@ class Fasterpay extends AbstractMethod
                 'first_name' => !empty($billingData['firstname']) ? $billingData['firstname'] : '',
                 'last_name' => !empty($billingData['lastname']) ? $billingData['lastname'] : '',
                 'city' => !empty($billingData['city']) ? $billingData['city'] : '',
-                'zip' => !empty($billingData['postcode']) ? $billingData['postcode'] : ''
+                'zip' => !empty($billingData['postcode']) ? $billingData['postcode'] : '',
+                'cancel_url' => $this->urlBuilder->getUrl('checkout/cart'),
             ],
             [
                 'autoSubmit' => true,
